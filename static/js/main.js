@@ -4,11 +4,34 @@ document.addEventListener('DOMContentLoaded', function() {
     const macroList = document.getElementById('macroList');
     const previewArea = document.getElementById('previewArea');
     const previewCode = document.getElementById('previewCode');
+    const templateSelect = document.getElementById('templateSelect');
+    const templateId = document.getElementById('templateId');
+    const macroTypeRadios = document.getElementsByName('macroType');
+
+    // マクロタイプの切り替え
+    macroTypeRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            if (e.target.value === 'template') {
+                templateSelect.style.display = 'block';
+                macroDescription.disabled = true;
+            } else {
+                templateSelect.style.display = 'none';
+                macroDescription.disabled = false;
+            }
+        });
+    });
 
     // マクロ生成処理
     generateButton.addEventListener('click', async () => {
-        if (!macroDescription.value) {
+        const useAI = document.getElementById('aiGenerate').checked;
+
+        if (useAI && !macroDescription.value) {
             alert('マクロの要件を入力してください');
+            return;
+        }
+
+        if (!useAI && !templateId.value) {
+            alert('テンプレートを選択してください');
             return;
         }
 
@@ -20,7 +43,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    description: macroDescription.value
+                    description: macroDescription.value,
+                    use_ai: useAI,
+                    template_id: useAI ? null : parseInt(templateId.value)
                 })
             });
 
@@ -38,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // ライブラリを更新
                 loadMacros();
-                
+
                 // プレビュー表示
                 previewArea.style.display = 'block';
                 previewCode.textContent = macroDescription.value;
@@ -58,8 +83,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch('/macros');
             if (response.ok) {
                 const macros = await response.json();
+
+                // テンプレートの選択肢を更新
+                const templates = macros.filter(macro => macro.category === 'TEMPLATE');
+                templateId.innerHTML = '<option value="">テンプレートを選択してください</option>';
+                templates.forEach(template => {
+                    const option = document.createElement('option');
+                    option.value = template.id;
+                    option.textContent = template.title;
+                    templateId.appendChild(option);
+                });
+
+                // マクロリストを更新
                 macroList.innerHTML = '';
-                
                 macros.forEach(macro => {
                     const li = document.createElement('li');
                     li.className = 'nav-item macro-item';
@@ -67,14 +103,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     li.innerHTML = `
                         <div>
                             <small class="text-muted">${date}</small>
-                            <div>${macro.description}</div>
+                            <div class="macro-title">${macro.title || '無題のマクロ'}</div>
+                            <small class="text-muted">${macro.category === 'TEMPLATE' ? 'テンプレート' : 'AI生成'}</small>
+                            <div class="macro-description">${macro.description}</div>
                         </div>
                     `;
-                    
-                    li.addEventListener('click', async () => {
+
+                    li.addEventListener('click', () => {
                         macroDescription.value = macro.description;
+                        if (macro.category === 'TEMPLATE') {
+                            document.getElementById('useTemplate').checked = true;
+                            templateSelect.style.display = 'block';
+                            templateId.value = macro.id;
+                            macroDescription.disabled = true;
+                        } else {
+                            document.getElementById('aiGenerate').checked = true;
+                            templateSelect.style.display = 'none';
+                            macroDescription.disabled = false;
+                        }
                     });
-                    
+
                     macroList.appendChild(li);
                 });
             }

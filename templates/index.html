@@ -30,6 +30,23 @@
 
                 <div class="row g-3">
                     <div class="col-12">
+                        <div class="btn-group mb-3" role="group">
+                            <input type="radio" class="btn-check" name="macroType" id="aiGenerate" value="ai" checked>
+                            <label class="btn btn-outline-primary" for="aiGenerate">AI自動生成</label>
+
+                            <input type="radio" class="btn-check" name="macroType" id="useTemplate" value="template">
+                            <label class="btn btn-outline-primary" for="useTemplate">テンプレート使用</label>
+                        </div>
+                    </div>
+
+                    <div class="col-12" id="templateSelect" style="display: none;">
+                        <select class="form-select" id="templateId">
+                            <option value="">テンプレートを選択してください</option>
+                            <!-- テンプレートはJavaScriptで動的に追加 -->
+                        </select>
+                    </div>
+
+                    <div class="col-12">
                         <div class="form-floating">
                             <textarea class="form-control" id="macroDescription" style="height: 100px"></textarea>
                             <label for="macroDescription">マクロの要件を入力してください</label>

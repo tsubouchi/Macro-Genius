@@ -3,24 +3,19 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
 from typing import List
 import openpyxl
 from datetime import datetime
 import database as db
+from models import Macro, MacroRequest, MacroCategory # Added import
+import openai # Added import
 
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-class MacroRequest(BaseModel):
-    description: str
-
-class MacroResponse(BaseModel):
-    id: int
-    description: str
-    created_at: str
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 @app.get("/")
 async def read_root(request: Request):
@@ -29,21 +24,43 @@ async def read_root(request: Request):
 @app.post("/generate-macro")
 async def generate_macro(macro_request: MacroRequest):
     try:
-        # 仮のマクロ生成ロジック
+        description = macro_request.description
+
+        if macro_request.template_id:
+            # テンプレートからマクロを生成
+            template = db.get_macro_by_id(macro_request.template_id)
+            if not template:
+                raise HTTPException(status_code=404, detail="Template not found")
+            description = template["description"]
+        elif macro_request.use_ai:
+            # GPT-4を使用してマクロの詳細を生成
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "あなたはExcelマクロの専門家です。ユーザーの要件に基づいて、実用的なVBAマクロを生成してください。"},
+                    {"role": "user", "content": f"以下の要件に基づくExcelマクロを作成してください：\n{description}"}
+                ]
+            )
+            description = response.choices[0].message.content
+
+        # Excelファイル生成
         wb = openpyxl.Workbook()
         ws = wb.active
         ws['A1'] = 'Generated Macro'
-        ws['A2'] = macro_request.description
-        
-        # ファイル保存
+        ws['A2'] = description
+
         filename = f"macro_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         filepath = f"temp/{filename}"
         os.makedirs("temp", exist_ok=True)
         wb.save(filepath)
-        
+
         # DBに保存
-        macro_id = db.save_macro(macro_request.description)
-        
+        macro_id = db.save_macro(
+            title=f"マクロ {datetime.now().strftime('%Y/%m/%d %H:%M')}",
+            description=description,
+            category=MacroCategory.AI_GENERATED if macro_request.use_ai else MacroCategory.TEMPLATE
+        )
+
         return FileResponse(
             filepath,
             filename=filename,
@@ -52,7 +69,7 @@ async def generate_macro(macro_request: MacroRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/macros", response_model=List[MacroResponse])
+@app.get("/macros", response_model=List[Macro]) # Updated response model
 async def get_macros():
     try:
         macros = db.get_all_macros()
