@@ -5,7 +5,7 @@ channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["gunicorn", "--bind", "0.0.0.0:5000", "main:app"]
+run = ["sh", "-c", "gunicorn -c gunicorn_config.py main:app"]
 
 [workflows]
 runButton = "Project"
@@ -17,10 +17,10 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "FastAPI Server"
+args = "Production Server"
 
 [[workflows.workflow]]
-name = "FastAPI Server"
+name = "Production Server"
 author = "agent"
 
 [workflows.workflow.metadata]
@@ -31,8 +31,12 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python main.py"
-waitForPort = 8000
+args = "gunicorn -c gunicorn_config.py main:app"
+waitForPort = 5000
+
+[[ports]]
+localPort = 5000
+externalPort = 5000
 
 [[ports]]
 localPort = 8000

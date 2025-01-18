@@ -12,9 +12,11 @@ import openai
 
 app = FastAPI()
 
+# 静的ファイルとテンプレートの設定
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+# OpenAI APIキーの設定
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 @app.get("/")
@@ -25,14 +27,13 @@ async def read_root(request: Request):
 async def generate_macro(macro_request: MacroRequest):
     try:
         if macro_request.template_id:
-            # テンプレートからマクロを生成（即時）
             template = db.get_macro_by_id(macro_request.template_id)
             if not template:
                 raise HTTPException(status_code=404, detail="Template not found")
 
-            # ファイル生成
             wb = openpyxl.Workbook()
             ws = wb.active
+            ws.title = "マクロ"
             ws['A1'] = template["title"]
             ws['A2'] = template["description"]
 
@@ -48,7 +49,6 @@ async def generate_macro(macro_request: MacroRequest):
             )
 
         elif macro_request.use_ai:
-            # GPT-4を使用してマクロの詳細を生成
             if not macro_request.description:
                 raise HTTPException(status_code=400, detail="Description is required for AI generation")
 
@@ -61,9 +61,9 @@ async def generate_macro(macro_request: MacroRequest):
             )
             description = response.choices[0].message.content
 
-            # ファイル生成
             wb = openpyxl.Workbook()
             ws = wb.active
+            ws.title = "マクロ"
             ws['A1'] = f"AI生成マクロ {datetime.now().strftime('%Y/%m/%d %H:%M')}"
             ws['A2'] = description
 
@@ -72,7 +72,6 @@ async def generate_macro(macro_request: MacroRequest):
             os.makedirs("temp", exist_ok=True)
             wb.save(filepath)
 
-            # DBに保存
             macro_id = db.save_macro(
                 title=f"マクロ {datetime.now().strftime('%Y/%m/%d %H:%M')}",
                 description=description,
@@ -97,6 +96,84 @@ async def get_macros():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# テンプレートマクロの初期データを作成
+@app.on_event("startup")
+async def startup_event():
+    try:
+        # テンプレートマクロの作成
+        templates = [
+            {
+                "title": "データ集計マクロ",
+                "description": """
+Sub データ集計()
+    ' 選択範囲の合計を計算
+    Dim rng As Range
+    Set rng = Selection
+
+    ' 合計を計算
+    Dim total As Double
+    total = WorksheetFunction.Sum(rng)
+
+    ' 結果を表示
+    MsgBox "選択範囲の合計: " & total
+End Sub
+"""
+            },
+            {
+                "title": "シート整理マクロ",
+                "description": """
+Sub シート整理()
+    ' すべてのシートをループ
+    Dim ws As Worksheet
+    For Each ws In ThisWorkbook.Worksheets
+        ' シートの最終行と列を取得
+        Dim lastRow As Long, lastCol As Long
+        lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+        lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+
+        ' オートフィット
+        ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, lastCol)).Columns.AutoFit
+    Next ws
+
+    MsgBox "すべてのシートを整理しました"
+End Sub
+"""
+            },
+            {
+                "title": "データ検索マクロ",
+                "description": """
+Sub データ検索()
+    ' 検索値の入力
+    Dim searchValue As String
+    searchValue = InputBox("検索する値を入力してください")
+
+    ' 検索実行
+    Dim foundCell As Range
+    Set foundCell = ActiveSheet.Range("A:Z").Find(searchValue)
+
+    ' 結果の処理
+    If Not foundCell Is Nothing Then
+        foundCell.Select
+        MsgBox "セル " & foundCell.Address & " に見つかりました"
+    Else
+        MsgBox "見つかりませんでした"
+    End If
+End Sub
+"""
+            }
+        ]
+
+        for template in templates:
+            db.save_macro(
+                title=template["title"],
+                description=template["description"],
+                category=MacroCategory.TEMPLATE
+            )
+
+    except Exception as e:
+        print(f"Error creating templates: {str(e)}")
+
+# ローカル開発用の設定のみを残す
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=5000)
