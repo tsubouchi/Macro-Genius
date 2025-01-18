@@ -24,8 +24,6 @@ async def read_root(request: Request):
 @app.post("/generate-macro")
 async def generate_macro(macro_request: MacroRequest):
     try:
-        description = macro_request.description
-
         if macro_request.template_id:
             # テンプレートからマクロを生成
             template = db.get_macro_by_id(macro_request.template_id)
@@ -34,14 +32,19 @@ async def generate_macro(macro_request: MacroRequest):
             description = template["description"]
         elif macro_request.use_ai:
             # GPT-4を使用してマクロの詳細を生成
+            if not macro_request.description:
+                raise HTTPException(status_code=400, detail="Description is required for AI generation")
+
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
                     {"role": "system", "content": "あなたはExcelマクロの専門家です。ユーザーの要件に基づいて、実用的なVBAマクロを生成してください。"},
-                    {"role": "user", "content": f"以下の要件に基づくExcelマクロを作成してください：\n{description}"}
+                    {"role": "user", "content": f"以下の要件に基づくExcelマクロを作成してください：\n{macro_request.description}"}
                 ]
             )
             description = response.choices[0].message.content
+        else:
+            raise HTTPException(status_code=400, detail="Either template_id or description with use_ai must be provided")
 
         # Excelファイル生成
         wb = openpyxl.Workbook()

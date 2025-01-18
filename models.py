@@ -14,6 +14,6 @@ class Macro(BaseModel):
     created_at: datetime
 
 class MacroRequest(BaseModel):
-    description: str
+    description: str | None = None  # descriptionをオプショナルに変更
     use_ai: bool = True
     template_id: int | None = None
