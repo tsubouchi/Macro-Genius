@@ -2,11 +2,111 @@ document.addEventListener('DOMContentLoaded', function() {
     const generateButton = document.getElementById('generateButton');
     const macroDescription = document.getElementById('macroDescription');
     const macroList = document.getElementById('macroList');
+    const categoryList = document.getElementById('categoryList');
     const previewArea = document.getElementById('previewArea');
     const previewCode = document.getElementById('previewCode');
     const templateSelect = document.getElementById('templateSelect');
     const templateId = document.getElementById('templateId');
+    const categorySelect = document.getElementById('categorySelect');
     const macroTypeRadios = document.getElementsByName('macroType');
+
+    let currentCategory = 'all';
+    let showPublicOnly = false;
+
+    // カテゴリーの定義
+    const categories = {
+        'TEMPLATE': 'テンプレート',
+        'AI_GENERATED': 'AI生成',
+        'DATA_PROCESSING': 'データ処理',
+        'FORMATTING': 'フォーマット',
+        'CALCULATION': '計算',
+        'AUTOMATION': '自動化',
+        'REPORTING': 'レポート',
+        'CUSTOM': 'カスタム'
+    };
+
+    // バージョン履歴を表示
+    async function showVersionHistory(macroId) {
+        try {
+            const response = await fetch(`/macros/${macroId}/versions`);
+            if (response.ok) {
+                const versions = await response.json();
+                const versionList = versions.map(version => `
+                    <div class="version-item mb-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>バージョン ${version.version_number}</span>
+                            <small class="text-muted">${new Date(version.created_at).toLocaleDateString()}</small>
+                        </div>
+                        <pre class="mt-2"><code>${version.content}</code></pre>
+                    </div>
+                `).join('');
+
+                previewArea.style.display = 'block';
+                previewCode.innerHTML = `
+                    <h4>バージョン履歴</h4>
+                    ${versionList}
+                `;
+            }
+        } catch (error) {
+            console.error('バージョン履歴の取得に失敗:', error);
+        }
+    }
+
+    // マクロの共有設定を更新
+    async function toggleShare(macroId, isPublic) {
+        try {
+            const response = await fetch(`/macros/${macroId}/share`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ is_public: isPublic })
+            });
+
+            if (response.ok) {
+                loadMacros();
+            } else {
+                throw new Error('共有設定の更新に失敗しました');
+            }
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    // カテゴリー選択肢の初期化
+    function initializeCategories() {
+        Object.entries(categories).forEach(([value, label]) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = label;
+            categorySelect.appendChild(option);
+
+            const li = document.createElement('li');
+            li.className = 'nav-item';
+            li.innerHTML = `
+                <a class="nav-link" href="#" data-category="${value}">
+                    ${label}
+                </a>
+            `;
+            categoryList.appendChild(li);
+        });
+
+        // カテゴリーフィルター機能
+        categoryList.addEventListener('click', (e) => {
+            if (e.target.classList.contains('nav-link')) {
+                e.preventDefault();
+                const category = e.target.dataset.category;
+                currentCategory = category;
+
+                categoryList.querySelectorAll('.nav-link').forEach(link => {
+                    link.classList.remove('active');
+                });
+                e.target.classList.add('active');
+
+                loadMacros();
+            }
+        });
+    }
 
     // マクロタイプの切り替え
     macroTypeRadios.forEach(radio => {
@@ -14,9 +114,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.target.value === 'template') {
                 templateSelect.style.display = 'block';
                 macroDescription.disabled = true;
+                categorySelect.value = 'TEMPLATE';
+                categorySelect.disabled = true;
             } else {
                 templateSelect.style.display = 'none';
                 macroDescription.disabled = false;
+                categorySelect.disabled = false;
             }
         });
     });
@@ -35,6 +138,11 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        if (!categorySelect.value) {
+            alert('カテゴリーを選択してください');
+            return;
+        }
+
         generateButton.disabled = true;
         try {
             const response = await fetch('/generate-macro', {
@@ -45,12 +153,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     description: macroDescription.value,
                     use_ai: useAI,
-                    template_id: useAI ? null : parseInt(templateId.value)
+                    template_id: useAI ? null : parseInt(templateId.value),
+                    category: categorySelect.value
                 })
             });
 
             if (response.ok) {
-                // Excelファイルのダウンロード
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -61,12 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
 
-                // ライブラリを更新
                 loadMacros();
-
-                // プレビュー表示
-                previewArea.style.display = 'block';
-                previewCode.textContent = macroDescription.value;
             } else {
                 throw new Error('マクロの生成に失敗しました');
             }
@@ -77,9 +180,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // マクロのダウンロード
     async function downloadMacro(macroId) {
         try {
-            const response = await fetch(`/generate-macro`, {
+            const response = await fetch('/generate-macro', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -111,7 +215,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // マクロライブラリの読み込み
     async function loadMacros() {
         try {
-            const response = await fetch('/macros');
+            const response = await fetch(`/macros?public=${showPublicOnly}`);
             if (response.ok) {
                 const macros = await response.json();
 
@@ -127,7 +231,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // マクロリストを更新
                 macroList.innerHTML = '';
-                macros.forEach(macro => {
+                let filteredMacros = macros;
+                if (currentCategory !== 'all') {
+                    filteredMacros = macros.filter(macro => macro.category === currentCategory);
+                }
+
+                filteredMacros.forEach(macro => {
                     const li = document.createElement('li');
                     li.className = 'nav-item macro-item';
                     const date = new Date(macro.created_at).toLocaleDateString();
@@ -135,13 +244,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="macro-content">
                             <div class="d-flex justify-content-between align-items-center">
                                 <small class="text-muted">${date}</small>
-                                <span class="badge bg-${macro.category === 'TEMPLATE' ? 'primary' : 'success'}">${macro.category === 'TEMPLATE' ? 'テンプレート' : 'AI生成'}</span>
+                                <span class="badge bg-${macro.category === 'TEMPLATE' ? 'primary' : 'success'}">${categories[macro.category] || macro.category}</span>
                             </div>
                             <h6 class="macro-title mb-2">${macro.title || '無題のマクロ'}</h6>
                             <p class="macro-description mb-2">${macro.description.split('\n')[0]}</p>
-                            <button class="btn btn-sm btn-outline-primary download-btn" onclick="event.stopPropagation(); downloadMacro(${macro.id})">
-                                ダウンロード
-                            </button>
+                            <div class="btn-group w-100">
+                                <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); downloadMacro(${macro.id})">
+                                    ダウンロード
+                                </button>
+                                <button class="btn btn-sm btn-outline-info" onclick="event.stopPropagation(); showVersionHistory(${macro.id})">
+                                    履歴
+                                </button>
+                                <button class="btn btn-sm ${macro.is_public ? 'btn-outline-warning' : 'btn-outline-success'}" onclick="event.stopPropagation(); toggleShare(${macro.id}, ${!macro.is_public})">
+                                    ${macro.is_public ? '非公開にする' : '共有する'}
+                                </button>
+                            </div>
                         </div>
                     `;
 
@@ -157,6 +274,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             templateSelect.style.display = 'none';
                             macroDescription.disabled = false;
                         }
+                        categorySelect.value = macro.category;
                     });
 
                     macroList.appendChild(li);
@@ -167,9 +285,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 初期読み込み
+    // 初期化
+    initializeCategories();
     loadMacros();
 
-    // downloadMacro関数をグローバルスコープに追加
+    // グローバル関数の定義
     window.downloadMacro = downloadMacro;
+    window.showVersionHistory = showVersionHistory;
+    window.toggleShare = toggleShare;
 });
