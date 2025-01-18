@@ -1,10 +1,15 @@
 import os
+import logging
 from flask import request, render_template, jsonify, send_file
 from datetime import datetime
 import openpyxl
-from models import MacroCategory, Macro, MacroVersion # Added MacroVersion import
 import openai
 from app import app, db
+from models import MacroCategory, Macro
+
+# ログ設定
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # OpenAI APIキーの設定
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -12,6 +17,19 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 @app.route('/')
 def index():
     return render_template("index.html")
+
+@app.route('/macros', methods=['GET'])
+def get_macros():
+    try:
+        show_public = request.args.get('public', 'false').lower() == 'true'
+        query = db.select(Macro)
+        if show_public:
+            query = query.filter_by(is_public=True)
+        macros = db.session.execute(query.order_by(Macro.created_at.desc())).scalars().all()
+        return jsonify([macro.to_dict() for macro in macros])
+    except Exception as e:
+        logger.error(f"Error in get_macros: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/generate-macro', methods=['POST'])
 def generate_macro():
@@ -21,6 +39,8 @@ def generate_macro():
         use_ai = data.get('use_ai', True)
         description = data.get('description')
         category = data.get('category', MacroCategory.AI_GENERATED)
+
+        logger.debug(f"Generating macro with parameters: template_id={template_id}, use_ai={use_ai}, category={category}")
 
         if template_id:
             template = db.session.execute(
@@ -37,7 +57,7 @@ def generate_macro():
             ws['A2'] = template.description
 
             filename = f"macro_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            filepath = f"temp/{filename}"
+            filepath = os.path.join("temp", filename)
             os.makedirs("temp", exist_ok=True)
             wb.save(filepath)
 
@@ -52,6 +72,7 @@ def generate_macro():
             if not description:
                 return jsonify({"error": "Description is required for AI generation"}), 400
 
+            logger.debug("Calling OpenAI API for macro generation")
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
@@ -80,7 +101,7 @@ def generate_macro():
             ws['A2'] = generated_content
 
             filename = f"macro_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            filepath = f"temp/{filename}"
+            filepath = os.path.join("temp", filename)
             os.makedirs("temp", exist_ok=True)
             wb.save(filepath)
 
@@ -93,18 +114,7 @@ def generate_macro():
         else:
             return jsonify({"error": "Either template_id or description with use_ai must be provided"}), 400
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/macros', methods=['GET'])
-def get_macros():
-    try:
-        show_public = request.args.get('public', 'false').lower() == 'true'
-        query = db.select(Macro)
-        if show_public:
-            query = query.filter_by(is_public=True)
-        macros = db.session.execute(query.order_by(Macro.created_at.desc())).scalars().all()
-        return jsonify([macro.to_dict() for macro in macros])
-    except Exception as e:
+        logger.error(f"Error in generate_macro: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 @app.route('/macros/<int:macro_id>', methods=['GET'])
@@ -116,18 +126,20 @@ def get_macro(macro_id):
         else:
             return jsonify({"error": "Macro not found"}), 404
     except Exception as e:
+        logger.error(f"Error in get_macro: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 @app.route('/macros/<int:macro_id>/versions', methods=['GET'])
 def get_macro_versions(macro_id):
     try:
         versions = db.session.execute(
-            db.select(MacroVersion)
-            .filter_by(macro_id=macro_id)
-            .order_by(MacroVersion.version_number.desc())
+            db.select(Macro.versions)
+            .filter_by(id=macro_id)
+            .order_by(Macro.versions.version_number.desc())
         ).scalars().all()
         return jsonify([version.to_dict() for version in versions])
     except Exception as e:
+        logger.error(f"Error in get_macro_versions: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 @app.route('/macros/<int:macro_id>/share', methods=['POST'])
@@ -144,7 +156,9 @@ def share_macro(macro_id):
 
         return jsonify({"message": "Sharing settings updated successfully"})
     except Exception as e:
+        logger.error(f"Error in share_macro: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
+    logger.info("Starting Flask application...")
     app.run(host='0.0.0.0', port=5000, debug=True)
