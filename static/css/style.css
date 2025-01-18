@@ -26,14 +26,42 @@ main {
 
 .macro-item {
     cursor: pointer;
-    padding: 8px 16px;
-    margin: 4px 0;
-    border-radius: 4px;
-    transition: background-color 0.2s;
+    padding: 12px;
+    margin: 8px;
+    border-radius: 8px;
+    background-color: var(--bs-dark);
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .macro-item:hover {
-    background-color: rgba(var(--bs-primary-rgb), 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.macro-content {
+    padding: 8px;
+}
+
+.macro-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.macro-description {
+    font-size: 0.875rem;
+    color: var(--bs-secondary);
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.download-btn {
+    width: 100%;
+    margin-top: 0.5rem;
 }
 
 /* スマートフォン向けのレスポンシブ対応 */

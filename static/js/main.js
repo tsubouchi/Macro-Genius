@@ -77,6 +77,37 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    async function downloadMacro(macroId) {
+        try {
+            const response = await fetch(`/generate-macro`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    template_id: macroId,
+                    use_ai: false
+                })
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'macro.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            } else {
+                throw new Error('マクロのダウンロードに失敗しました');
+            }
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
     // マクロライブラリの読み込み
     async function loadMacros() {
         try {
@@ -101,11 +132,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     li.className = 'nav-item macro-item';
                     const date = new Date(macro.created_at).toLocaleDateString();
                     li.innerHTML = `
-                        <div>
-                            <small class="text-muted">${date}</small>
-                            <div class="macro-title">${macro.title || '無題のマクロ'}</div>
-                            <small class="text-muted">${macro.category === 'TEMPLATE' ? 'テンプレート' : 'AI生成'}</small>
-                            <div class="macro-description">${macro.description}</div>
+                        <div class="macro-content">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">${date}</small>
+                                <span class="badge bg-${macro.category === 'TEMPLATE' ? 'primary' : 'success'}">${macro.category === 'TEMPLATE' ? 'テンプレート' : 'AI生成'}</span>
+                            </div>
+                            <h6 class="macro-title mb-2">${macro.title || '無題のマクロ'}</h6>
+                            <p class="macro-description mb-2">${macro.description.split('\n')[0]}</p>
+                            <button class="btn btn-sm btn-outline-primary download-btn" onclick="event.stopPropagation(); downloadMacro(${macro.id})">
+                                ダウンロード
+                            </button>
                         </div>
                     `;
 
@@ -133,4 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 初期読み込み
     loadMacros();
+
+    // downloadMacro関数をグローバルスコープに追加
+    window.downloadMacro = downloadMacro;
 });
