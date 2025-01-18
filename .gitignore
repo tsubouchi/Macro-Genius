@@ -27,3 +27,7 @@ ENV/
 *.swp
 .DS_Store
 temp/
+.secrets
+*.env*
+.env.local
+.env.*.local
