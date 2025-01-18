@@ -173,7 +173,8 @@ End Sub
     except Exception as e:
         print(f"Error creating templates: {str(e)}")
 
-# ローカル開発用の設定のみを残す
+# ローカル開発用の設定
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv('PORT', 3000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
