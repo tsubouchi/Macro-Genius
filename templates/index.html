@@ -10,8 +10,20 @@
 <body>
     <div class="container-fluid">
         <div class="row">
+            <!-- サイドバー -->
+            <div class="col-md-3 col-lg-2 d-md-block bg-dark sidebar">
+                <div class="position-sticky pt-3">
+                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
+                        <span>マクロライブラリ</span>
+                    </h6>
+                    <ul class="nav flex-column mb-2" id="macroList">
+                        <!-- マクロリストがここに動的に追加されます -->
+                    </ul>
+                </div>
+            </div>
+
             <!-- メインコンテンツ -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <main class="col-md-9 col-lg-10 ms-sm-auto px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">AI Macro Generator</h1>
                 </div>
@@ -35,18 +47,6 @@
                     <pre class="bg-dark p-3 rounded"><code id="previewCode"></code></pre>
                 </div>
             </main>
-
-            <!-- サイドバー -->
-            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-dark sidebar collapse">
-                <div class="position-sticky pt-3">
-                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
-                        <span>マクロライブラリ</span>
-                    </h6>
-                    <ul class="nav flex-column" id="macroList">
-                        <!-- マクロリストがここに動的に追加されます -->
-                    </ul>
-                </div>
-            </nav>
         </div>
     </div>
 

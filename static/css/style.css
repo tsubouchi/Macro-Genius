@@ -6,6 +6,7 @@
     z-index: 100;
     padding: 48px 0 0;
     box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+    overflow-y: auto;
 }
 
 .sidebar-heading {
@@ -14,7 +15,7 @@
 }
 
 main {
-    margin-left: 240px;
+    padding-top: 1.5rem;
 }
 
 #previewArea {
@@ -26,9 +27,24 @@ main {
 .macro-item {
     cursor: pointer;
     padding: 8px 16px;
+    margin: 4px 0;
+    border-radius: 4px;
     transition: background-color 0.2s;
 }
 
 .macro-item:hover {
-    background-color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+}
+
+/* スマートフォン向けのレスポンシブ対応 */
+@media (max-width: 767.98px) {
+    .sidebar {
+        position: static;
+        height: auto;
+        padding-top: 1rem;
+    }
+
+    main {
+        margin-left: 0;
+    }
 }
