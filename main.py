@@ -10,6 +10,7 @@ import database as db
 from models import Macro, MacroRequest, MacroCategory
 import openai
 
+# FastAPIアプリケーションの設定
 app = FastAPI()
 
 # 静的ファイルとテンプレートの設定
@@ -173,7 +174,7 @@ End Sub
     except Exception as e:
         print(f"Error creating templates: {str(e)}")
 
-# ローカル開発用の設定
+# ローカル開発用の設定を更新
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv('PORT', 3000))

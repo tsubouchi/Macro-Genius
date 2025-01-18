@@ -31,3 +31,4 @@ temp/
 *.env*
 .env.local
 .env.*.local
+generated_macros/
