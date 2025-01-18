@@ -7,8 +7,8 @@ from typing import List
 import openpyxl
 from datetime import datetime
 import database as db
-from models import Macro, MacroRequest, MacroCategory # Added import
-import openai # Added import
+from models import Macro, MacroRequest, MacroCategory
+import openai
 
 app = FastAPI()
 
@@ -25,11 +25,28 @@ async def read_root(request: Request):
 async def generate_macro(macro_request: MacroRequest):
     try:
         if macro_request.template_id:
-            # テンプレートからマクロを生成
+            # テンプレートからマクロを生成（即時）
             template = db.get_macro_by_id(macro_request.template_id)
             if not template:
                 raise HTTPException(status_code=404, detail="Template not found")
-            description = template["description"]
+
+            # ファイル生成
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws['A1'] = template["title"]
+            ws['A2'] = template["description"]
+
+            filename = f"macro_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            filepath = f"temp/{filename}"
+            os.makedirs("temp", exist_ok=True)
+            wb.save(filepath)
+
+            return FileResponse(
+                filepath,
+                filename=filename,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
         elif macro_request.use_ai:
             # GPT-4を使用してマクロの詳細を生成
             if not macro_request.description:
@@ -43,36 +60,36 @@ async def generate_macro(macro_request: MacroRequest):
                 ]
             )
             description = response.choices[0].message.content
+
+            # ファイル生成
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws['A1'] = f"AI生成マクロ {datetime.now().strftime('%Y/%m/%d %H:%M')}"
+            ws['A2'] = description
+
+            filename = f"macro_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            filepath = f"temp/{filename}"
+            os.makedirs("temp", exist_ok=True)
+            wb.save(filepath)
+
+            # DBに保存
+            macro_id = db.save_macro(
+                title=f"マクロ {datetime.now().strftime('%Y/%m/%d %H:%M')}",
+                description=description,
+                category=MacroCategory.AI_GENERATED
+            )
+
+            return FileResponse(
+                filepath,
+                filename=filename,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
         else:
             raise HTTPException(status_code=400, detail="Either template_id or description with use_ai must be provided")
-
-        # Excelファイル生成
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws['A1'] = 'Generated Macro'
-        ws['A2'] = description
-
-        filename = f"macro_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        filepath = f"temp/{filename}"
-        os.makedirs("temp", exist_ok=True)
-        wb.save(filepath)
-
-        # DBに保存
-        macro_id = db.save_macro(
-            title=f"マクロ {datetime.now().strftime('%Y/%m/%d %H:%M')}",
-            description=description,
-            category=MacroCategory.AI_GENERATED if macro_request.use_ai else MacroCategory.TEMPLATE
-        )
-
-        return FileResponse(
-            filepath,
-            filename=filename,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/macros", response_model=List[Macro]) # Updated response model
+@app.get("/macros", response_model=List[Macro])
 async def get_macros():
     try:
         macros = db.get_all_macros()
